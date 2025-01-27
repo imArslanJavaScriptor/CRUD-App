@@ -1,70 +1,109 @@
 // script.js
 
-const BASE_URL = "https://jsonplaceholder.typicode.com/";
+const API_URL = "https://jsonplaceholder.typicode.com/posts";
 
-// Generic API Handler
-async function apiRequest(endpoint, method = "GET", data = null) {
+const postForm = document.getElementById("postForm");
+const postsContainer = document.getElementById("postsContainer");
+const postIdInput = document.getElementById("postId");
+const titleInput = document.getElementById("titleInput");
+const bodyInput = document.getElementById("bodyInput");
+
+// Fetch and display posts
+async function fetchPosts() {
   try {
-    const options = {
-      method,
-      headers: { "Content-Type": "application/json" },
-    };
-    if (data) options.body = JSON.stringify(data);
-
-    const response = await fetch(BASE_URL + endpoint, options);
-
-    if (!response.ok) {
-      throw new Error(`Error: ${response.status} ${response.statusText}`);
-    }
-
-    const result = await response.json();
-    return result;
+    const response = await fetch(API_URL);
+    const posts = await response.json();
+    renderPosts(posts.slice(0, 10)); // Limit to 10 posts for simplicity
   } catch (error) {
-    console.error(error);
-    return { error: error.message };
+    console.error("Error fetching posts:", error);
   }
 }
 
-// Example CRUD Operations
-async function performCRUD() {
-  const output = document.getElementById("output");
-
-  // 1. GET all posts
-  output.innerHTML = "<h3>Fetching posts...</h3>";
-  let posts = await apiRequest("posts");
-  if (posts.error) return (output.innerHTML = `<p>${posts.error}</p>`);
-  output.innerHTML = `<h3>Posts:</h3><pre>${JSON.stringify(posts.slice(0, 5), null, 2)}</pre>`;
-
-  // 2. POST: Add a new post
-  const newPost = {
-    title: "My New Post",
-    body: "This is the content of my new post.",
-    userId: 1,
-  };
-  let createdPost = await apiRequest("posts", "POST", newPost);
-  if (createdPost.error) return (output.innerHTML = `<p>${createdPost.error}</p>`);
-  output.innerHTML += `<h3>New Post Created:</h3><pre>${JSON.stringify(createdPost, null, 2)}</pre>`;
-
-  // 3. PUT: Update a post
-  const updatedPost = {
-    title: "Updated Title",
-    body: "Updated content for the post.",
-  };
-  let updated = await apiRequest("posts/1", "PUT", updatedPost);
-  if (updated.error) return (output.innerHTML = `<p>${updated.error}</p>`);
-  output.innerHTML += `<h3>Post Updated:</h3><pre>${JSON.stringify(updated, null, 2)}</pre>`;
-
-  // 4. PATCH: Partial update a post
-  const partialUpdate = { title: "Partially Updated Title" };
-  let patched = await apiRequest("posts/1", "PATCH", partialUpdate);
-  if (patched.error) return (output.innerHTML = `<p>${patched.error}</p>`);
-  output.innerHTML += `<h3>Post Partially Updated:</h3><pre>${JSON.stringify(patched, null, 2)}</pre>`;
-
-  // 5. DELETE: Delete a post
-  let deleted = await apiRequest("posts/1", "DELETE");
-  if (deleted.error) return (output.innerHTML = `<p>${deleted.error}</p>`);
-  output.innerHTML += `<h3>Post Deleted:</h3><p>Post ID 1 deleted successfully!</p>`;
+// Render posts in the UI
+function renderPosts(posts) {
+  postsContainer.innerHTML = "";
+  posts.forEach((post) => {
+    const postCard = document.createElement("div");
+    postCard.classList.add("post-card");
+    postCard.innerHTML = `
+      <h3>${post.title}</h3>
+      <p>${post.body}</p>
+      <div class="actions">
+        <button class="edit" onclick="editPost(${post.id})">Edit</button>
+        <button class="delete" onclick="deletePost(${post.id})">Delete</button>
+      </div>
+    `;
+    postsContainer.appendChild(postCard);
+  });
 }
 
-// Execute CRUD Operations
-performCRUD();
+// Add or update post
+postForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const postId = postIdInput.value;
+  const title = titleInput.value;
+  const body = bodyInput.value;
+
+  const postData = { title, body, userId: 1 };
+
+  if (postId) {
+    // Update existing post (PUT)
+    try {
+      const response = await fetch(`${API_URL}/${postId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(postData),
+      });
+      const updatedPost = await response.json();
+      console.log("Updated Post:", updatedPost);
+    } catch (error) {
+      console.error("Error updating post:", error);
+    }
+  } else {
+    // Add new post (POST)
+    try {
+      const response = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(postData),
+      });
+      const newPost = await response.json();
+      console.log("New Post:", newPost);
+    } catch (error) {
+      console.error("Error adding post:", error);
+    }
+  }
+
+  postForm.reset();
+  postIdInput.value = "";
+  fetchPosts();
+});
+
+// Edit post
+async function editPost(id) {
+  try {
+    const response = await fetch(`${API_URL}/${id}`);
+    const post = await response.json();
+
+    postIdInput.value = post.id;
+    titleInput.value = post.title;
+    bodyInput.value = post.body;
+  } catch (error) {
+    console.error("Error fetching post for edit:", error);
+  }
+}
+
+// Delete post
+async function deletePost(id) {
+  try {
+    await fetch(`${API_URL}/${id}`, { method: "DELETE" });
+    console.log(`Post ${id} deleted`);
+    fetchPosts();
+  } catch (error) {
+    console.error("Error deleting post:", error);
+  }
+}
+
+// Initialize app
+fetchPosts();
